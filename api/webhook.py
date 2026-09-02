@@ -6,17 +6,17 @@ from telegram import Update
 from bot import build_application
 
 
-application = build_application()
+bot_app = build_application()
 
 
 async def process_update(data):
-    update = Update.de_json(data, application.bot)
+    update = Update.de_json(data, bot_app.bot)
 
-    await application.initialize()
+    await bot_app.initialize()
     try:
-        await application.process_update(update)
+        await bot_app.process_update(update)
     finally:
-        await application.shutdown()
+        await bot_app.shutdown()
 
 
 class handler(BaseHTTPRequestHandler):
