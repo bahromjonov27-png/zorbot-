@@ -1,29 +1,49 @@
-from telegram import Update
-from telegram.ext import Application
+import asyncio
+import json
+from http.server import BaseHTTPRequestHandler
 
+from telegram import Update
 from bot import build_application
 
 
-app: Application = build_application()
+application = build_application()
 
 
-async def handler(request):
-    if request.method != "POST":
-        return {
-            "statusCode": 405,
-            "body": "Method Not Allowed",
-        }
+async def process_update(data):
+    update = Update.de_json(data, application.bot)
 
-    data = await request.json()
-    update = Update.de_json(data, app.bot)
-
-    await app.initialize()
+    await application.initialize()
     try:
-        await app.process_update(update)
+        await application.process_update(update)
     finally:
-        await app.shutdown()
+        await application.shutdown()
 
-    return {
-        "statusCode": 200,
-        "body": "OK",
-    }
+
+class handler(BaseHTTPRequestHandler):
+
+    def do_POST(self):
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body)
+
+            asyncio.run(process_update(data))
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+
+        except Exception as e:
+            print("WEBHOOK ERROR:", repr(e))
+
+            self.send_response(500)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Internal Server Error")
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Webhook is running")
