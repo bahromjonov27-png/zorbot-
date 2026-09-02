@@ -28,7 +28,7 @@ from telegram.ext import (
 
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID_RAW = os.getenv("ADMIN_ID")
-DB_PATH = os.getenv("DB_PATH", "avtomaktab.db")
+DB_PATH = os.getenv("DB_PATH", "/tmp/avtomaktab.db" if os.getenv("VERCEL") else "avtomaktab.db")
 SCHOOL_LATITUDE = 41.329341
 SCHOOL_LONGITUDE = 69.238440
 
