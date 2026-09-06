@@ -29,15 +29,35 @@ from telegram.ext import (
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# Hisobotlar va arizalar yuboriladigan ADMIN GURUHI
+# =========================================================
+# ADMIN GURUHI ID
+# =========================================================
+
 ADMIN_ID_RAW = os.getenv("ADMIN_ID")
 
-# Admin USER IDlari
-# .env dagi ADMIN_IDS ga bog'liq emas
-ADMIN_IDS = {
-    6514150973,
-    8487314122,
-}
+# =========================================================
+# ADMIN USER IDLARI
+# Vercel:
+# ADMIN_USER_ID=6514150973,8487314122
+# =========================================================
+
+ADMIN_USER_ID_RAW = os.getenv("ADMIN_USER_ID", "")
+
+try:
+    ADMIN_IDS = {
+        int(x.strip())
+        for x in ADMIN_USER_ID_RAW.split(",")
+        if x.strip()
+    }
+except ValueError:
+    raise RuntimeError(
+        "ADMIN_USER_ID noto‘g‘ri! "
+        "Masalan: 6514150973,8487314122"
+    )
+
+# =========================================================
+# DATABASE
+# =========================================================
 
 DB_PATH = os.getenv(
     "DB_PATH",
@@ -46,6 +66,10 @@ DB_PATH = os.getenv(
 
 SCHOOL_LATITUDE = 41.329341
 SCHOOL_LONGITUDE = 69.238440
+
+# =========================================================
+# CONFIG TEKSHIRISH
+# =========================================================
 
 if not TOKEN:
     raise RuntimeError(
@@ -62,7 +86,13 @@ try:
     ADMIN_ID = int(ADMIN_ID_RAW)
 except ValueError:
     raise RuntimeError(
-        "ADMIN_ID raqam bo'lishi kerak!"
+        "ADMIN_ID raqam bo‘lishi kerak! "
+        "Masalan: -1001234567890"
+    )
+
+if not ADMIN_IDS:
+    raise RuntimeError(
+        "ADMIN_USER_ID environment variable topilmadi yoki bo‘sh!"
     )
 
 
@@ -398,9 +428,9 @@ async def get_passport(
     if update.message.text == "❌ Bekor qilish":
         return await cancel(update, context)
 
-    # -----------------------------------------------------
+    # =====================================================
     # PASPORT OLD TOMONI
-    # -----------------------------------------------------
+    # =====================================================
 
     if not context.user_data.get(
         "passport_front_message_id"
@@ -462,9 +492,9 @@ async def get_passport(
 
         return PASSPORT
 
-    # -----------------------------------------------------
+    # =====================================================
     # PASPORT ORQA TOMONI
-    # -----------------------------------------------------
+    # =====================================================
 
     if update.message.photo:
 
@@ -942,9 +972,10 @@ async def is_admin(
         return False
 
     logger.info(
-        "Admin tekshiruvi: user_id=%s username=%s",
+        "Admin tekshiruvi: user_id=%s username=%s admin_ids=%s",
         user.id,
         user.username,
+        ADMIN_IDS,
     )
 
     return user.id in ADMIN_IDS
@@ -1439,9 +1470,9 @@ def build_application():
         allow_reentry=True,
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # COMMANDS
-    # -----------------------------------------------------
+    # =====================================================
 
     app.add_handler(
         CommandHandler(
@@ -1471,17 +1502,17 @@ def build_application():
         )
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # REGISTRATION
-    # -----------------------------------------------------
+    # =====================================================
 
     app.add_handler(
         registration
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # ADMIN BUTTONS
-    # -----------------------------------------------------
+    # =====================================================
 
     app.add_handler(
         CallbackQueryHandler(
@@ -1490,9 +1521,9 @@ def build_application():
         )
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # MENU
-    # -----------------------------------------------------
+    # =====================================================
 
     app.add_handler(
         MessageHandler(
@@ -1519,6 +1550,16 @@ def main():
 
     logger.info(
         "🚗 ZO‘R-777 AVTO MAKTAB bot ishga tushdi!"
+    )
+
+    logger.info(
+        "ADMIN_ID (GROUP): %s",
+        ADMIN_ID,
+    )
+
+    logger.info(
+        "ADMIN_IDS (USERS): %s",
+        ADMIN_IDS,
     )
 
     app.run_polling(
