@@ -327,6 +327,8 @@ async def get_passport(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.message.photo:
         context.user_data["passport"] = update.message.photo[-1].file_id
+        context.user_data["passport_message_id"] = update.message.message_id
+        context.user_data["passport_chat_id"] = update.message.chat_id
 
     elif update.message.document:
         document = update.message.document
@@ -338,6 +340,8 @@ async def get_passport(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return PASSPORT
 
         context.user_data["passport"] = document.file_id
+        context.user_data["passport_message_id"] = update.message.message_id
+        context.user_data["passport_chat_id"] = update.message.chat_id
 
     else:
         await update.message.reply_text(
@@ -362,6 +366,8 @@ async def get_medical(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.message.photo:
         context.user_data["medical"] = update.message.photo[-1].file_id
+        context.user_data["medical_message_id"] = update.message.message_id
+        context.user_data["medical_chat_id"] = update.message.chat_id
 
     elif update.message.document:
         document = update.message.document
@@ -373,6 +379,8 @@ async def get_medical(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return MEDICAL
 
         context.user_data["medical"] = document.file_id
+        context.user_data["medical_message_id"] = update.message.message_id
+        context.user_data["medical_chat_id"] = update.message.chat_id
 
     else:
         await update.message.reply_text(
@@ -439,21 +447,30 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML,
         )
 
-        # Hujjatlarni admin chatiga yuborish.
-        # Ular alohida xavfsiz tizimga ko‘chirilmasa,
-        # Telegram chatida saqlanib qolishi mumkin.
-        if data.get("passport"):
-            await context.bot.send_document(
+        # Pasportni asl xabar turi bilan yuborish: rasm bo'lsa rasm, PDF bo'lsa PDF.
+        if context.user_data.get("passport_message_id"):
+            await context.bot.send_message(
                 chat_id=ADMIN_ID,
-                document=data["passport"],
-                caption=f"🪪 Pasport — ariza #{registration_id}",
+                text=f"🪪 <b>Pasport — ariza #{registration_id}</b>",
+                parse_mode=ParseMode.HTML,
+            )
+            await context.bot.copy_message(
+                chat_id=ADMIN_ID,
+                from_chat_id=context.user_data["passport_chat_id"],
+                message_id=context.user_data["passport_message_id"],
             )
 
-        if data.get("medical"):
-            await context.bot.send_document(
+        # 083 formani asl xabar turi bilan yuborish.
+        if context.user_data.get("medical_message_id"):
+            await context.bot.send_message(
                 chat_id=ADMIN_ID,
-                document=data["medical"],
-                caption=f"🩺 083 forma — ariza #{registration_id}",
+                text=f"🩺 <b>083 forma — ariza #{registration_id}</b>",
+                parse_mode=ParseMode.HTML,
+            )
+            await context.bot.copy_message(
+                chat_id=ADMIN_ID,
+                from_chat_id=context.user_data["medical_chat_id"],
+                message_id=context.user_data["medical_message_id"],
             )
 
     except Exception:
