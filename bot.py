@@ -577,14 +577,21 @@ def get_week_stats(start_dt, end_dt):
     return total, categories
 
 
-def build_weekly_report():
+def build_weekly_report(week_offset=0):
     now = datetime.now(UZ_TZ)
-    week_start = (now - timedelta(days=now.weekday())).replace(
+    current_week_start = (now - timedelta(days=now.weekday())).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
+    week_start = current_week_start - timedelta(days=7 * week_offset)
+    week_end = week_start + timedelta(days=7)
     previous_week_start = week_start - timedelta(days=7)
 
-    total, categories = get_week_stats(week_start, now + timedelta(seconds=1))
+    if week_offset == 0:
+        report_end = now + timedelta(seconds=1)
+    else:
+        report_end = week_end
+
+    total, categories = get_week_stats(week_start, report_end)
     previous_total, _ = get_week_stats(previous_week_start, week_start)
 
     difference = total - previous_total
@@ -598,7 +605,7 @@ def build_weekly_report():
     lines = [
         "📊 <b>HAFTALIK HISOBOT</b>",
         "",
-        f"📅 {week_start.strftime('%d.%m.%Y')} — {now.strftime('%d.%m.%Y')}",
+        f"📅 {week_start.strftime('%d.%m.%Y')} — {(report_end - timedelta(seconds=1)).strftime('%d.%m.%Y')}",
         f"👥 Yangi ro‘yxatdan o‘tganlar: <b>{total} ta</b>",
         f"🕐 Hisobot vaqti: {now.strftime('%d.%m.%Y %H:%M')}",
         "",
@@ -617,7 +624,7 @@ def build_weekly_report():
 
 
 async def weekly_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update):
+    if not await is_admin(update, context):
         await update.message.reply_text("⛔ Sizda admin huquqi yo‘q.")
         return
 
@@ -650,7 +657,7 @@ async def weekly_report_loop(app):
         try:
             await app.bot.send_message(
                 chat_id=ADMIN_ID,
-                text=build_weekly_report(),
+                text=build_weekly_report(week_offset=1),
                 parse_mode=ParseMode.HTML,
             )
             logger.info("Haftalik hisobot admin guruhga yuborildi.")
@@ -682,12 +689,33 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ADMIN
 # =========================================================
 
-def is_admin(update: Update):
-    return update.effective_user and update.effective_user.id == ADMIN_ID
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if not user:
+        return False
+
+    # .env dagi ADMIN_ID egasi doim admin hisoblanadi.
+    if user.id == ADMIN_ID:
+        return True
+
+    # Guruh/superguruhda yozayotgan foydalanuvchi admin yoki creator bo‘lsa ruxsat.
+    chat = update.effective_chat
+    if chat and chat.type in ("group", "supergroup"):
+        try:
+            member = await context.bot.get_chat_member(
+                chat_id=chat.id,
+                user_id=user.id,
+            )
+            return member.status in ("administrator", "creator")
+        except Exception:
+            logger.exception("Guruh adminini tekshirishda xatolik")
+
+    return False
 
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update):
+    if not await is_admin(update, context):
         await update.message.reply_text("⛔ Sizda admin huquqi yo‘q.")
         return
 
@@ -720,7 +748,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
 
-    if query.from_user.id != ADMIN_ID:
+    if not await is_admin(update, context):
         await query.answer("⛔ Ruxsat yo‘q.", show_alert=True)
         return
 
