@@ -312,7 +312,7 @@ async def get_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["birthday"] = birthday
 
     await update.message.reply_text(
-        "4️⃣ 🪪 <b>Pasport hujjatini yuboring.</b>\n\n"
+        "4️⃣ 🪪 <b>Pasportning OLD TOMONINI yuboring.</b>\n\n"
         "📸 Rasm yoki 📄 PDF yuboring.",
         parse_mode=ParseMode.HTML,
         reply_markup=cancel_keyboard(),
@@ -325,32 +325,70 @@ async def get_passport(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == "❌ Bekor qilish":
         return await cancel(update, context)
 
+    # Pasport OLD TOMONI
+    if not context.user_data.get("passport_front_message_id"):
+        if update.message.photo:
+            context.user_data["passport_front"] = update.message.photo[-1].file_id
+            context.user_data["passport_front_message_id"] = update.message.message_id
+            context.user_data["passport_front_chat_id"] = update.message.chat_id
+
+        elif update.message.document:
+            document = update.message.document
+
+            if document.mime_type != "application/pdf":
+                await update.message.reply_text(
+                    "❗ Pasportni rasm yoki PDF formatida yuboring."
+                )
+                return PASSPORT
+
+            context.user_data["passport_front"] = document.file_id
+            context.user_data["passport_front_message_id"] = update.message.message_id
+            context.user_data["passport_front_chat_id"] = update.message.chat_id
+
+        else:
+            await update.message.reply_text(
+                "❗ Pasportning OLD TOMONINI rasm yoki PDF ko‘rinishida yuboring."
+            )
+            return PASSPORT
+
+        await update.message.reply_text(
+            "✅ Pasportning OLD TOMONI qabul qilindi.\n\n"
+            "➡️ Endi <b>pasportning ORQA TOMONINI</b> yuboring.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=cancel_keyboard(),
+        )
+        return PASSPORT
+
+    # Pasport ORQA TOMONI
     if update.message.photo:
-        context.user_data["passport"] = update.message.photo[-1].file_id
-        context.user_data["passport_message_id"] = update.message.message_id
-        context.user_data["passport_chat_id"] = update.message.chat_id
+        context.user_data["passport_back"] = update.message.photo[-1].file_id
+        context.user_data["passport_back_message_id"] = update.message.message_id
+        context.user_data["passport_back_chat_id"] = update.message.chat_id
 
     elif update.message.document:
         document = update.message.document
 
         if document.mime_type != "application/pdf":
             await update.message.reply_text(
-                "❗ Pasportni rasm yoki PDF formatida yuboring."
+                "❗ Pasportning ORQA TOMONINI rasm yoki PDF formatida yuboring."
             )
             return PASSPORT
 
-        context.user_data["passport"] = document.file_id
-        context.user_data["passport_message_id"] = update.message.message_id
-        context.user_data["passport_chat_id"] = update.message.chat_id
+        context.user_data["passport_back"] = document.file_id
+        context.user_data["passport_back_message_id"] = update.message.message_id
+        context.user_data["passport_back_chat_id"] = update.message.chat_id
 
     else:
         await update.message.reply_text(
-            "❗ Pasportni rasm yoki PDF ko‘rinishida yuboring."
+            "❗ Pasportning ORQA TOMONINI rasm yoki PDF ko‘rinishida yuboring."
         )
         return PASSPORT
 
+    # DB dagi eski passport_file_id ustuni bilan moslik uchun old tomondagi file_id saqlanadi.
+    context.user_data["passport"] = context.user_data["passport_front"]
+
     await update.message.reply_text(
-        "✅ Pasport qabul qilindi.\n\n"
+        "✅ Pasportning OLD va ORQA TOMONI qabul qilindi.\n\n"
         "5️⃣ 🩺 <b>083 tibbiy formasini yuboring.</b>\n\n"
         "📸 Rasm yoki 📄 PDF yuboring.",
         parse_mode=ParseMode.HTML,
@@ -358,7 +396,6 @@ async def get_passport(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return MEDICAL
-
 
 async def get_medical(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == "❌ Bekor qilish":
@@ -447,17 +484,30 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML,
         )
 
-        # Pasportni asl xabar turi bilan yuborish: rasm bo'lsa rasm, PDF bo'lsa PDF.
-        if context.user_data.get("passport_message_id"):
+        # Pasport OLD TOMONINI asl xabar turi bilan yuborish.
+        if context.user_data.get("passport_front_message_id"):
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
-                text=f"🪪 <b>Pasport — ariza #{registration_id}</b>",
+                text=f"🪪 <b>Pasport OLD TOMONI — ariza #{registration_id}</b>",
                 parse_mode=ParseMode.HTML,
             )
             await context.bot.copy_message(
                 chat_id=ADMIN_ID,
-                from_chat_id=context.user_data["passport_chat_id"],
-                message_id=context.user_data["passport_message_id"],
+                from_chat_id=context.user_data["passport_front_chat_id"],
+                message_id=context.user_data["passport_front_message_id"],
+            )
+
+        # Pasport ORQA TOMONINI asl xabar turi bilan yuborish.
+        if context.user_data.get("passport_back_message_id"):
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=f"🪪 <b>Pasport ORQA TOMONI — ariza #{registration_id}</b>",
+                parse_mode=ParseMode.HTML,
+            )
+            await context.bot.copy_message(
+                chat_id=ADMIN_ID,
+                from_chat_id=context.user_data["passport_back_chat_id"],
+                message_id=context.user_data["passport_back_message_id"],
             )
 
         # 083 formani asl xabar turi bilan yuborish.
