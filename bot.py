@@ -1,8 +1,9 @@
 import os
 import re
+import asyncio
 import sqlite3
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from telegram import (
     Update,
@@ -548,6 +549,120 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # =========================================================
+# WEEKLY REPORT
+# =========================================================
+
+UZ_TZ = timezone(timedelta(hours=5))
+
+
+def get_week_stats(start_dt, end_dt):
+    """Berilgan vaqt oralig‘idagi ro‘yxatdan o‘tganlar statistikasini qaytaradi."""
+    start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
+    end_str = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    with db_connect() as conn:
+        total = conn.execute(
+            """SELECT COUNT(*) FROM registrations
+               WHERE created_at >= ? AND created_at < ?""",
+            (start_str, end_str),
+        ).fetchone()[0]
+
+        categories = conn.execute(
+            """SELECT category, COUNT(*) FROM registrations
+               WHERE created_at >= ? AND created_at < ?
+               GROUP BY category ORDER BY COUNT(*) DESC""",
+            (start_str, end_str),
+        ).fetchall()
+
+    return total, categories
+
+
+def build_weekly_report():
+    now = datetime.now(UZ_TZ)
+    week_start = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    previous_week_start = week_start - timedelta(days=7)
+
+    total, categories = get_week_stats(week_start, now + timedelta(seconds=1))
+    previous_total, _ = get_week_stats(previous_week_start, week_start)
+
+    difference = total - previous_total
+    if difference > 0:
+        comparison = f"📈 O‘tgan haftaga nisbatan: +{difference} ta"
+    elif difference < 0:
+        comparison = f"📉 O‘tgan haftaga nisbatan: {difference} ta"
+    else:
+        comparison = "➡️ O‘tgan hafta bilan bir xil"
+
+    lines = [
+        "📊 <b>HAFTALIK HISOBOT</b>",
+        "",
+        f"📅 {week_start.strftime('%d.%m.%Y')} — {now.strftime('%d.%m.%Y')}",
+        f"👥 Yangi ro‘yxatdan o‘tganlar: <b>{total} ta</b>",
+        f"🕐 Hisobot vaqti: {now.strftime('%d.%m.%Y %H:%M')}",
+        "",
+        comparison,
+        f"📋 O‘tgan hafta: <b>{previous_total} ta</b>",
+    ]
+
+    if categories:
+        lines.extend(["", "🚗 <b>Kategoriyalar bo‘yicha:</b>"])
+        for category, count in categories:
+            lines.append(f"• {category}: <b>{count} ta</b>")
+    else:
+        lines.extend(["", "📭 Bu hafta hali yangi ro‘yxatdan o‘tganlar yo‘q."])
+
+    return "\n".join(lines)
+
+
+async def weekly_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        await update.message.reply_text("⛔ Sizda admin huquqi yo‘q.")
+        return
+
+    await update.message.reply_text(
+        build_weekly_report(),
+        parse_mode=ParseMode.HTML,
+    )
+
+
+async def weekly_report_loop(app):
+    """Har dushanba soat 09:00 da admin guruhga avtomatik hisobot yuboradi."""
+    while True:
+        now = datetime.now(UZ_TZ)
+        days_until_monday = (7 - now.weekday()) % 7
+        next_monday = (now + timedelta(days=days_until_monday)).replace(
+            hour=9, minute=0, second=0, microsecond=0
+        )
+
+        # Agar hozir dushanba 09:00 dan o‘tgan bo‘lsa, keyingi dushanbani olamiz.
+        if next_monday <= now:
+            next_monday += timedelta(days=7)
+
+        wait_seconds = (next_monday - now).total_seconds()
+        logger.info(
+            "Keyingi haftalik hisobot: %s (Toshkent vaqti)",
+            next_monday.strftime("%Y-%m-%d %H:%M"),
+        )
+        await asyncio.sleep(wait_seconds)
+
+        try:
+            await app.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=build_weekly_report(),
+                parse_mode=ParseMode.HTML,
+            )
+            logger.info("Haftalik hisobot admin guruhga yuborildi.")
+        except Exception:
+            logger.exception("Haftalik hisobotni yuborishda xatolik")
+
+
+async def post_init(app):
+    asyncio.create_task(weekly_report_loop(app))
+
+
+# =========================================================
 # CANCEL
 # =========================================================
 
@@ -722,7 +837,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 def build_application():
     init_db()
 
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).post_init(post_init).build()
 
     registration = ConversationHandler(
         entry_points=[
@@ -787,6 +902,7 @@ def build_application():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin))
+    app.add_handler(CommandHandler("hisobot", weekly_report_command))
     app.add_handler(registration)
     app.add_handler(
         CallbackQueryHandler(
