@@ -28,33 +28,43 @@ from telegram.ext import (
 # =========================================================
 
 TOKEN = os.getenv("BOT_TOKEN")
-# Hisobotlar va arizalar yuboriladigan admin guruhining IDsi
+
+# Hisobotlar va arizalar yuboriladigan ADMIN GURUHI
 ADMIN_ID_RAW = os.getenv("ADMIN_ID")
-# Hisobot/admin buyruqlaridan foydalanishi mumkin bo‘lgan USER IDlar
-ADMIN_IDS_RAW = os.getenv("ADMIN_IDS", "6514150973,8487314122")
-DB_PATH = os.getenv("DB_PATH", "/tmp/avtomaktab.db" if os.getenv("VERCEL") else "avtomaktab.db")
+
+# Admin USER IDlari
+# .env dagi ADMIN_IDS ga bog'liq emas
+ADMIN_IDS = {
+    6514150973,
+    8487314122,
+}
+
+DB_PATH = os.getenv(
+    "DB_PATH",
+    "/tmp/avtomaktab.db" if os.getenv("VERCEL") else "avtomaktab.db"
+)
+
 SCHOOL_LATITUDE = 41.329341
 SCHOOL_LONGITUDE = 69.238440
 
 if not TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable topilmadi!")
+    raise RuntimeError(
+        "BOT_TOKEN environment variable topilmadi!"
+    )
 
 if not ADMIN_ID_RAW:
-    raise RuntimeError("ADMIN_ID environment variable topilmadi! Bu yerga admin GURUH IDsi yoziladi.")
+    raise RuntimeError(
+        "ADMIN_ID environment variable topilmadi! "
+        "Bu yerga admin GURUH IDsi yoziladi."
+    )
 
 try:
     ADMIN_ID = int(ADMIN_ID_RAW)
 except ValueError:
-    raise RuntimeError("ADMIN_ID raqam bo‘lishi kerak!")
+    raise RuntimeError(
+        "ADMIN_ID raqam bo'lishi kerak!"
+    )
 
-try:
-    ADMIN_IDS = {
-        int(x.strip())
-        for x in ADMIN_IDS_RAW.split(",")
-        if x.strip()
-    }
-except ValueError:
-    raise RuntimeError("ADMIN_IDS vergul bilan ajratilgan raqamli USER IDlar bo‘lishi kerak!")
 
 # =========================================================
 # LOGGING
@@ -64,13 +74,16 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+
 logger = logging.getLogger(__name__)
+
 
 # =========================================================
 # STATES
 # =========================================================
 
 NAME, PHONE, BIRTHDAY, PASSPORT, MEDICAL, CATEGORY = range(6)
+
 
 # =========================================================
 # DATABASE
@@ -128,7 +141,9 @@ def save_registration(data):
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             ),
         )
+
         conn.commit()
+
         return cursor.lastrowid
 
 
@@ -137,6 +152,7 @@ def get_registration_count():
         row = conn.execute(
             "SELECT COUNT(*) FROM registrations"
         ).fetchone()
+
         return row[0]
 
 
@@ -151,6 +167,7 @@ def get_last_registrations(limit=10):
             """,
             (limit,),
         ).fetchall()
+
 
 # =========================================================
 # TEXT / KEYBOARDS
@@ -187,11 +204,13 @@ def cancel_keyboard():
         one_time_keyboard=True,
     )
 
+
 # =========================================================
 # START
 # =========================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     context.user_data.clear()
 
     await update.message.reply_text(
@@ -200,11 +219,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu(),
     )
 
+
 # =========================================================
 # REGISTRATION
 # =========================================================
 
-async def register_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def register_start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     if update.callback_query:
         await update.callback_query.answer()
         message = update.callback_query.message
@@ -223,10 +247,15 @@ async def register_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return NAME
 
 
-async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_name(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     name = update.message.text.strip()
 
     if len(name) < 3 or name == "❌ Bekor qilish":
+
         if name == "❌ Bekor qilish":
             return await cancel(update, context)
 
@@ -235,22 +264,25 @@ async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Masalan: <b>Ahmadjon Bahromjonov</b>",
             parse_mode=ParseMode.HTML,
         )
+
         return NAME
 
     context.user_data["name"] = name
 
     keyboard = [
-        [KeyboardButton(
-            "📱 Telefon raqamni yuborish",
-            request_contact=True,
-        )],
+        [
+            KeyboardButton(
+                "📱 Telefon raqamni yuborish",
+                request_contact=True,
+            )
+        ],
         ["❌ Bekor qilish"],
     ]
 
     await update.message.reply_text(
         "2️⃣ <b>Telefon raqamingizni yuboring:</b>\n\n"
-        "Pastdagi tugma orqali Telegram kontakt sifatida yuborishingiz "
-        "yoki raqamni qo‘lda yozishingiz mumkin.",
+        "Pastdagi tugma orqali Telegram kontakt sifatida "
+        "yuborishingiz yoki raqamni qo‘lda yozishingiz mumkin.",
         parse_mode=ParseMode.HTML,
         reply_markup=ReplyKeyboardMarkup(
             keyboard,
@@ -262,7 +294,11 @@ async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return PHONE
 
 
-async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_phone(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     if update.message.text == "❌ Bekor qilish":
         return await cancel(update, context)
 
@@ -270,22 +306,28 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.message.contact:
         phone = update.message.contact.phone_number
+
     elif update.message.text:
         phone = update.message.text.strip()
 
     if not phone:
-        await update.message.reply_text("❗ Telefon raqamini yuboring.")
+        await update.message.reply_text(
+            "❗ Telefon raqamini yuboring."
+        )
+
         return PHONE
 
     cleaned = re.sub(r"[^\d+]", "", phone)
     digits = re.sub(r"\D", "", cleaned)
 
     if len(digits) < 9:
+
         await update.message.reply_text(
             "❗ Telefon raqami noto‘g‘ri.\n"
             "Masalan: <b>+998901234567</b>",
             parse_mode=ParseMode.HTML,
         )
+
         return PHONE
 
     context.user_data["phone"] = cleaned
@@ -301,25 +343,35 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return BIRTHDAY
 
 
-async def get_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_birthday(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     birthday = update.message.text.strip()
 
     if birthday == "❌ Bekor qilish":
         return await cancel(update, context)
 
     try:
-        date = datetime.strptime(birthday, "%d.%m.%Y")
+
+        date = datetime.strptime(
+            birthday,
+            "%d.%m.%Y"
+        )
 
         if date > datetime.now():
             raise ValueError
 
     except ValueError:
+
         await update.message.reply_text(
             "❗ Sana noto‘g‘ri.\n\n"
             "To‘g‘ri format:\n"
             "<code>15.04.2008</code>",
             parse_mode=ParseMode.HTML,
         )
+
         return BIRTHDAY
 
     context.user_data["birthday"] = birthday
@@ -334,34 +386,71 @@ async def get_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return PASSPORT
 
 
-async def get_passport(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# =========================================================
+# PASSPORT
+# =========================================================
+
+async def get_passport(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     if update.message.text == "❌ Bekor qilish":
         return await cancel(update, context)
 
-    # Pasport OLD TOMONI
-    if not context.user_data.get("passport_front_message_id"):
+    # -----------------------------------------------------
+    # PASPORT OLD TOMONI
+    # -----------------------------------------------------
+
+    if not context.user_data.get(
+        "passport_front_message_id"
+    ):
+
         if update.message.photo:
-            context.user_data["passport_front"] = update.message.photo[-1].file_id
-            context.user_data["passport_front_message_id"] = update.message.message_id
-            context.user_data["passport_front_chat_id"] = update.message.chat_id
+
+            context.user_data["passport_front"] = (
+                update.message.photo[-1].file_id
+            )
+
+            context.user_data[
+                "passport_front_message_id"
+            ] = update.message.message_id
+
+            context.user_data[
+                "passport_front_chat_id"
+            ] = update.message.chat_id
 
         elif update.message.document:
+
             document = update.message.document
 
             if document.mime_type != "application/pdf":
+
                 await update.message.reply_text(
                     "❗ Pasportni rasm yoki PDF formatida yuboring."
                 )
+
                 return PASSPORT
 
-            context.user_data["passport_front"] = document.file_id
-            context.user_data["passport_front_message_id"] = update.message.message_id
-            context.user_data["passport_front_chat_id"] = update.message.chat_id
+            context.user_data["passport_front"] = (
+                document.file_id
+            )
+
+            context.user_data[
+                "passport_front_message_id"
+            ] = update.message.message_id
+
+            context.user_data[
+                "passport_front_chat_id"
+            ] = update.message.chat_id
 
         else:
+
             await update.message.reply_text(
-                "❗ Pasportning OLD TOMONINI rasm yoki PDF ko‘rinishida yuboring."
+                "❗ Pasportning OLD TOMONINI "
+                "rasm yoki PDF ko‘rinishida yuboring."
             )
+
             return PASSPORT
 
         await update.message.reply_text(
@@ -370,35 +459,64 @@ async def get_passport(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML,
             reply_markup=cancel_keyboard(),
         )
+
         return PASSPORT
 
-    # Pasport ORQA TOMONI
+    # -----------------------------------------------------
+    # PASPORT ORQA TOMONI
+    # -----------------------------------------------------
+
     if update.message.photo:
-        context.user_data["passport_back"] = update.message.photo[-1].file_id
-        context.user_data["passport_back_message_id"] = update.message.message_id
-        context.user_data["passport_back_chat_id"] = update.message.chat_id
+
+        context.user_data["passport_back"] = (
+            update.message.photo[-1].file_id
+        )
+
+        context.user_data[
+            "passport_back_message_id"
+        ] = update.message.message_id
+
+        context.user_data[
+            "passport_back_chat_id"
+        ] = update.message.chat_id
 
     elif update.message.document:
+
         document = update.message.document
 
         if document.mime_type != "application/pdf":
+
             await update.message.reply_text(
-                "❗ Pasportning ORQA TOMONINI rasm yoki PDF formatida yuboring."
+                "❗ Pasportning ORQA TOMONINI "
+                "rasm yoki PDF formatida yuboring."
             )
+
             return PASSPORT
 
-        context.user_data["passport_back"] = document.file_id
-        context.user_data["passport_back_message_id"] = update.message.message_id
-        context.user_data["passport_back_chat_id"] = update.message.chat_id
+        context.user_data["passport_back"] = (
+            document.file_id
+        )
+
+        context.user_data[
+            "passport_back_message_id"
+        ] = update.message.message_id
+
+        context.user_data[
+            "passport_back_chat_id"
+        ] = update.message.chat_id
 
     else:
+
         await update.message.reply_text(
-            "❗ Pasportning ORQA TOMONINI rasm yoki PDF ko‘rinishida yuboring."
+            "❗ Pasportning ORQA TOMONINI "
+            "rasm yoki PDF ko‘rinishida yuboring."
         )
+
         return PASSPORT
 
-    # DB dagi eski passport_file_id ustuni bilan moslik uchun old tomondagi file_id saqlanadi.
-    context.user_data["passport"] = context.user_data["passport_front"]
+    context.user_data["passport"] = (
+        context.user_data["passport_front"]
+    )
 
     await update.message.reply_text(
         "✅ Pasportning OLD va ORQA TOMONI qabul qilindi.\n\n"
@@ -410,32 +528,63 @@ async def get_passport(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return MEDICAL
 
-async def get_medical(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# =========================================================
+# MEDICAL
+# =========================================================
+
+async def get_medical(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     if update.message.text == "❌ Bekor qilish":
         return await cancel(update, context)
 
     if update.message.photo:
-        context.user_data["medical"] = update.message.photo[-1].file_id
-        context.user_data["medical_message_id"] = update.message.message_id
-        context.user_data["medical_chat_id"] = update.message.chat_id
+
+        context.user_data["medical"] = (
+            update.message.photo[-1].file_id
+        )
+
+        context.user_data[
+            "medical_message_id"
+        ] = update.message.message_id
+
+        context.user_data[
+            "medical_chat_id"
+        ] = update.message.chat_id
 
     elif update.message.document:
+
         document = update.message.document
 
         if document.mime_type != "application/pdf":
+
             await update.message.reply_text(
                 "❗ 083 formasini rasm yoki PDF formatida yuboring."
             )
+
             return MEDICAL
 
-        context.user_data["medical"] = document.file_id
-        context.user_data["medical_message_id"] = update.message.message_id
-        context.user_data["medical_chat_id"] = update.message.chat_id
+        context.user_data["medical"] = (
+            document.file_id
+        )
+
+        context.user_data[
+            "medical_message_id"
+        ] = update.message.message_id
+
+        context.user_data[
+            "medical_chat_id"
+        ] = update.message.chat_id
 
     else:
+
         await update.message.reply_text(
             "❗ 083 formasini rasm yoki PDF ko‘rinishida yuboring."
         )
+
         return MEDICAL
 
     keyboard = [
@@ -457,11 +606,23 @@ async def get_medical(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CATEGORY
 
 
-async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# =========================================================
+# CATEGORY
+# =========================================================
+
+async def get_category(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     query = update.callback_query
+
     await query.answer()
 
-    category = query.data.replace("category_", "")
+    category = query.data.replace(
+        "category_",
+        ""
+    )
 
     data = {
         "telegram_id": update.effective_user.id,
@@ -476,7 +637,6 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     registration_id = save_registration(data)
 
-    # Admin summary
     admin_text = (
         "🚨 <b>YANGI RO‘YXATDAN O‘TISH</b>\n\n"
         f"🆔 Ariza: <code>#{registration_id}</code>\n"
@@ -491,53 +651,93 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
+
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=admin_text,
             parse_mode=ParseMode.HTML,
         )
 
-        # Pasport OLD TOMONINI asl xabar turi bilan yuborish.
-        if context.user_data.get("passport_front_message_id"):
+        # PASPORT OLD
+
+        if context.user_data.get(
+            "passport_front_message_id"
+        ):
+
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
-                text=f"🪪 <b>Pasport OLD TOMONI — ariza #{registration_id}</b>",
+                text=(
+                    f"🪪 <b>Pasport OLD TOMONI — "
+                    f"ariza #{registration_id}</b>"
+                ),
                 parse_mode=ParseMode.HTML,
-            )
-            await context.bot.copy_message(
-                chat_id=ADMIN_ID,
-                from_chat_id=context.user_data["passport_front_chat_id"],
-                message_id=context.user_data["passport_front_message_id"],
             )
 
-        # Pasport ORQA TOMONINI asl xabar turi bilan yuborish.
-        if context.user_data.get("passport_back_message_id"):
-            await context.bot.send_message(
-                chat_id=ADMIN_ID,
-                text=f"🪪 <b>Pasport ORQA TOMONI — ariza #{registration_id}</b>",
-                parse_mode=ParseMode.HTML,
-            )
             await context.bot.copy_message(
                 chat_id=ADMIN_ID,
-                from_chat_id=context.user_data["passport_back_chat_id"],
-                message_id=context.user_data["passport_back_message_id"],
+                from_chat_id=context.user_data[
+                    "passport_front_chat_id"
+                ],
+                message_id=context.user_data[
+                    "passport_front_message_id"
+                ],
             )
 
-        # 083 formani asl xabar turi bilan yuborish.
-        if context.user_data.get("medical_message_id"):
+        # PASPORT ORQA
+
+        if context.user_data.get(
+            "passport_back_message_id"
+        ):
+
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
-                text=f"🩺 <b>083 forma — ariza #{registration_id}</b>",
+                text=(
+                    f"🪪 <b>Pasport ORQA TOMONI — "
+                    f"ariza #{registration_id}</b>"
+                ),
                 parse_mode=ParseMode.HTML,
             )
+
             await context.bot.copy_message(
                 chat_id=ADMIN_ID,
-                from_chat_id=context.user_data["medical_chat_id"],
-                message_id=context.user_data["medical_message_id"],
+                from_chat_id=context.user_data[
+                    "passport_back_chat_id"
+                ],
+                message_id=context.user_data[
+                    "passport_back_message_id"
+                ],
+            )
+
+        # 083 FORMA
+
+        if context.user_data.get(
+            "medical_message_id"
+        ):
+
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=(
+                    f"🩺 <b>083 forma — "
+                    f"ariza #{registration_id}</b>"
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+
+            await context.bot.copy_message(
+                chat_id=ADMIN_ID,
+                from_chat_id=context.user_data[
+                    "medical_chat_id"
+                ],
+                message_id=context.user_data[
+                    "medical_message_id"
+                ],
             )
 
     except Exception:
-        logger.exception("Admin'ga ariza yuborishda xatolik")
+
+        logger.exception(
+            "Admin'ga ariza yuborishda xatolik"
+        )
 
     await query.message.reply_text(
         "🎉 <b>RO‘YXATDAN O‘TISH MUVAFFAQIYATLI!</b>\n\n"
@@ -560,146 +760,351 @@ async def get_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return ConversationHandler.END
 
+
 # =========================================================
 # WEEKLY REPORT
 # =========================================================
 
-UZ_TZ = timezone(timedelta(hours=5))
+UZ_TZ = timezone(
+    timedelta(hours=5)
+)
 
 
 def get_week_stats(start_dt, end_dt):
-    """Berilgan vaqt oralig‘idagi ro‘yxatdan o‘tganlar statistikasini qaytaradi."""
-    start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
-    end_str = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    start_str = start_dt.strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    end_str = end_dt.strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
     with db_connect() as conn:
+
         total = conn.execute(
-            """SELECT COUNT(*) FROM registrations
-               WHERE created_at >= ? AND created_at < ?""",
-            (start_str, end_str),
+            """
+            SELECT COUNT(*)
+            FROM registrations
+            WHERE created_at >= ?
+            AND created_at < ?
+            """,
+            (
+                start_str,
+                end_str,
+            ),
         ).fetchone()[0]
 
         categories = conn.execute(
-            """SELECT category, COUNT(*) FROM registrations
-               WHERE created_at >= ? AND created_at < ?
-               GROUP BY category ORDER BY COUNT(*) DESC""",
-            (start_str, end_str),
+            """
+            SELECT category, COUNT(*)
+            FROM registrations
+            WHERE created_at >= ?
+            AND created_at < ?
+            GROUP BY category
+            ORDER BY COUNT(*) DESC
+            """,
+            (
+                start_str,
+                end_str,
+            ),
         ).fetchall()
 
     return total, categories
 
 
-def build_weekly_report(week_offset=0):
+def build_weekly_report(
+    week_offset=0
+):
+
     now = datetime.now(UZ_TZ)
-    current_week_start = (now - timedelta(days=now.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
+
+    current_week_start = (
+        now - timedelta(days=now.weekday())
+    ).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
-    week_start = current_week_start - timedelta(days=7 * week_offset)
-    week_end = week_start + timedelta(days=7)
-    previous_week_start = week_start - timedelta(days=7)
+
+    week_start = (
+        current_week_start
+        - timedelta(days=7 * week_offset)
+    )
+
+    week_end = (
+        week_start + timedelta(days=7)
+    )
+
+    previous_week_start = (
+        week_start - timedelta(days=7)
+    )
 
     if week_offset == 0:
-        report_end = now + timedelta(seconds=1)
+        report_end = (
+            now + timedelta(seconds=1)
+        )
     else:
         report_end = week_end
 
-    total, categories = get_week_stats(week_start, report_end)
-    previous_total, _ = get_week_stats(previous_week_start, week_start)
+    total, categories = get_week_stats(
+        week_start,
+        report_end,
+    )
+
+    previous_total, _ = get_week_stats(
+        previous_week_start,
+        week_start,
+    )
 
     difference = total - previous_total
+
     if difference > 0:
-        comparison = f"📈 O‘tgan haftaga nisbatan: +{difference} ta"
+
+        comparison = (
+            f"📈 O‘tgan haftaga nisbatan: "
+            f"+{difference} ta"
+        )
+
     elif difference < 0:
-        comparison = f"📉 O‘tgan haftaga nisbatan: {difference} ta"
+
+        comparison = (
+            f"📉 O‘tgan haftaga nisbatan: "
+            f"{difference} ta"
+        )
+
     else:
-        comparison = "➡️ O‘tgan hafta bilan bir xil"
+
+        comparison = (
+            "➡️ O‘tgan hafta bilan bir xil"
+        )
 
     lines = [
         "📊 <b>HAFTALIK HISOBOT</b>",
         "",
-        f"📅 {week_start.strftime('%d.%m.%Y')} — {(report_end - timedelta(seconds=1)).strftime('%d.%m.%Y')}",
-        f"👥 Yangi ro‘yxatdan o‘tganlar: <b>{total} ta</b>",
-        f"🕐 Hisobot vaqti: {now.strftime('%d.%m.%Y %H:%M')}",
+        (
+            f"📅 {week_start.strftime('%d.%m.%Y')} — "
+            f"{(report_end - timedelta(seconds=1)).strftime('%d.%m.%Y')}"
+        ),
+        (
+            f"👥 Yangi ro‘yxatdan o‘tganlar: "
+            f"<b>{total} ta</b>"
+        ),
+        (
+            f"🕐 Hisobot vaqti: "
+            f"{now.strftime('%d.%m.%Y %H:%M')}"
+        ),
         "",
         comparison,
-        f"📋 O‘tgan hafta: <b>{previous_total} ta</b>",
+        (
+            f"📋 O‘tgan hafta: "
+            f"<b>{previous_total} ta</b>"
+        ),
     ]
 
     if categories:
-        lines.extend(["", "🚗 <b>Kategoriyalar bo‘yicha:</b>"])
+
+        lines.extend([
+            "",
+            "🚗 <b>Kategoriyalar bo‘yicha:</b>",
+        ])
+
         for category, count in categories:
-            lines.append(f"• {category}: <b>{count} ta</b>")
+
+            lines.append(
+                f"• {category}: <b>{count} ta</b>"
+            )
+
     else:
-        lines.extend(["", "📭 Bu hafta hali yangi ro‘yxatdan o‘tganlar yo‘q."])
+
+        lines.extend([
+            "",
+            "📭 Bu hafta hali yangi "
+            "ro‘yxatdan o‘tganlar yo‘q.",
+        ])
 
     return "\n".join(lines)
 
 
-async def weekly_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# =========================================================
+# ADMIN CHECK
+# =========================================================
+
+async def is_admin(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    user = update.effective_user
+
+    if not user:
+        return False
+
+    logger.info(
+        "Admin tekshiruvi: user_id=%s username=%s",
+        user.id,
+        user.username,
+    )
+
+    return user.id in ADMIN_IDS
+
+
+# =========================================================
+# MY ID
+# =========================================================
+
+async def my_id(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    user = update.effective_user
+
+    if not user:
+        return
+
+    await update.message.reply_text(
+        f"🆔 Sizning Telegram ID: "
+        f"<code>{user.id}</code>\n"
+        f"👤 Username: "
+        f"@{user.username or 'mavjud emas'}",
+        parse_mode=ParseMode.HTML,
+    )
+
+
+# =========================================================
+# WEEKLY REPORT COMMAND
+# =========================================================
+
+async def weekly_report_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     if not await is_admin(update, context):
-        await update.message.reply_text("⛔ Sizda admin huquqi yo‘q.")
+
+        await update.message.reply_text(
+            "⛔ Sizda admin huquqi yo‘q."
+        )
+
         return
 
     report = build_weekly_report()
 
     try:
+
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=report,
             parse_mode=ParseMode.HTML,
         )
 
-        # Agar buyruq shaxsiy chatdan yuborilgan bo‘lsa, yuborilgani haqida xabar beradi.
-        if update.effective_chat and update.effective_chat.id != ADMIN_ID:
-            await update.message.reply_text("✅ Haftalik hisobot admin guruhga yuborildi.")
+        if (
+            update.effective_chat
+            and update.effective_chat.id != ADMIN_ID
+        ):
+
+            await update.message.reply_text(
+                "✅ Haftalik hisobot admin guruhga yuborildi."
+            )
 
     except Exception:
-        logger.exception("/hisobot yuborishda xatolik")
-        await update.message.reply_text(
-            "❌ Hisobotni guruhga yuborib bo‘lmadi. ADMIN_ID guruh IDsi ekanini va bot guruhda ekanini tekshiring."
+
+        logger.exception(
+            "/hisobot yuborishda xatolik"
         )
 
+        await update.message.reply_text(
+            "❌ Hisobotni guruhga yuborib bo‘lmadi.\n\n"
+            "ADMIN_ID guruh IDsi ekanini va "
+            "bot guruhda ekanini tekshiring."
+        )
+
+
+# =========================================================
+# AUTOMATIC WEEKLY REPORT
+# =========================================================
 
 async def weekly_report_loop(app):
-    """Har dushanba soat 09:00 da admin guruhga avtomatik hisobot yuboradi."""
+
     while True:
+
         now = datetime.now(UZ_TZ)
-        days_until_monday = (7 - now.weekday()) % 7
-        next_monday = (now + timedelta(days=days_until_monday)).replace(
-            hour=9, minute=0, second=0, microsecond=0
+
+        days_until_monday = (
+            7 - now.weekday()
+        ) % 7
+
+        next_monday = (
+            now + timedelta(
+                days=days_until_monday
+            )
+        ).replace(
+            hour=9,
+            minute=0,
+            second=0,
+            microsecond=0,
         )
 
-        # Agar hozir dushanba 09:00 dan o‘tgan bo‘lsa, keyingi dushanbani olamiz.
         if next_monday <= now:
-            next_monday += timedelta(days=7)
 
-        wait_seconds = (next_monday - now).total_seconds()
+            next_monday += timedelta(
+                days=7
+            )
+
+        wait_seconds = (
+            next_monday - now
+        ).total_seconds()
+
         logger.info(
-            "Keyingi haftalik hisobot: %s (Toshkent vaqti)",
-            next_monday.strftime("%Y-%m-%d %H:%M"),
+            "Keyingi haftalik hisobot: %s",
+            next_monday.strftime(
+                "%Y-%m-%d %H:%M"
+            ),
         )
-        await asyncio.sleep(wait_seconds)
+
+        await asyncio.sleep(
+            wait_seconds
+        )
 
         try:
+
             await app.bot.send_message(
                 chat_id=ADMIN_ID,
-                text=build_weekly_report(week_offset=1),
+                text=build_weekly_report(
+                    week_offset=1
+                ),
                 parse_mode=ParseMode.HTML,
             )
-            logger.info("Haftalik hisobot admin guruhga yuborildi.")
+
+            logger.info(
+                "Haftalik hisobot yuborildi."
+            )
+
         except Exception:
-            logger.exception("Haftalik hisobotni yuborishda xatolik")
+
+            logger.exception(
+                "Haftalik hisobotni yuborishda xatolik"
+            )
 
 
 async def post_init(app):
-    asyncio.create_task(weekly_report_loop(app))
+
+    asyncio.create_task(
+        weekly_report_loop(app)
+    )
 
 
 # =========================================================
 # CANCEL
 # =========================================================
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cancel(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     context.user_data.clear()
 
     await update.message.reply_text(
@@ -711,22 +1116,22 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return ConversationHandler.END
 
+
 # =========================================================
-# ADMIN
+# ADMIN PANEL
 # =========================================================
 
-async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Faqat ADMIN_IDS ichidagi Telegram USER IDlarga ruxsat beradi."""
-    user = update.effective_user
-    if not user:
-        return False
+async def admin(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-    return user.id in ADMIN_IDS
-
-
-async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context):
-        await update.message.reply_text("⛔ Sizda admin huquqi yo‘q.")
+
+        await update.message.reply_text(
+            "⛔ Sizda admin huquqi yo‘q."
+        )
+
         return
 
     count = get_registration_count()
@@ -751,41 +1156,70 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 Jami arizalar: <b>{count}</b>\n\n"
         "Kerakli bo‘limni tanlang:",
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        ),
     )
 
 
-async def admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_buttons(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     query = update.callback_query
 
-    if not await is_admin(update, context):
-        await query.answer("⛔ Ruxsat yo‘q.", show_alert=True)
+    if not await is_admin(
+        update,
+        context
+    ):
+
+        await query.answer(
+            "⛔ Ruxsat yo‘q.",
+            show_alert=True,
+        )
+
         return
 
     await query.answer()
 
     if query.data == "admin_stats":
+
         count = get_registration_count()
 
         await query.message.reply_text(
             "📊 <b>STATISTIKA</b>\n\n"
-            f"👥 Jami ro‘yxatdan o‘tganlar: <b>{count}</b>",
+            f"👥 Jami ro‘yxatdan o‘tganlar: "
+            f"<b>{count}</b>",
             parse_mode=ParseMode.HTML,
         )
 
     elif query.data == "admin_students":
+
         rows = get_last_registrations(10)
 
         if not rows:
+
             await query.message.reply_text(
                 "📭 Hozircha arizalar yo‘q."
             )
+
             return
 
-        text = "👥 <b>SO‘NGGI ARIZALAR</b>\n\n"
+        text = (
+            "👥 <b>SO‘NGGI ARIZALAR</b>\n\n"
+        )
 
         for row in rows:
-            reg_id, name, phone, birthday, category, created = row
+
+            (
+                reg_id,
+                name,
+                phone,
+                birthday,
+                category,
+                created,
+            ) = row
 
             text += (
                 f"🆔 #{reg_id}\n"
@@ -802,40 +1236,53 @@ async def admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML,
         )
 
+
 # =========================================================
 # MENU
 # =========================================================
 
-async def menu_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def menu_buttons(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     text = update.message.text
 
     responses = {
+
         "📚 Darslar": (
             "📚 <b>DARSLAR</b>\n\n"
             "📖 Nazariy mashg‘ulotlar\n"
             "🚗 Amaliy haydash\n"
             "📝 Yo‘l harakati qoidalari"
         ),
+
         "🧠 Test": (
             "🧠 <b>TEST</b>\n\n"
             "Yo‘l harakati qoidalari bo‘yicha "
             "test tizimi tez orada ishga tushadi."
         ),
+
         "👨‍🏫 O‘qituvchilar": (
             "👨‍🏫 <b>O‘QITUVCHILAR</b>\n\n"
             "Tajribali instruktorlarimiz haqida "
             "ma’lumot tez orada qo‘shiladi."
         ),
+
         "📅 Dars jadvali": (
             "📅 <b>DARS JADVALI</b>\n\n"
             "Dars kunlari va vaqtlarini "
-            "avtomaktab ma’muriyatidan bilib olishingiz mumkin."
+            "avtomaktab ma’muriyatidan bilib "
+            "olishingiz mumkin."
         ),
+
         "📍 Manzil": (
             "📍 <b>MANZIL</b>\n\n"
             "ZO‘R-777 AVTO MAKTAB\n"
-            "📌 Koordinata: <code>41.329341, 69.238440</code>"
+            "📌 Koordinata: "
+            "<code>41.329341, 69.238440</code>"
         ),
+
         "📞 Bog‘lanish": (
             "📞 <b>BOG‘LANISH</b>\n\n"
             "☎️ Telefon: +998 (90) 807-12-22\n"
@@ -846,6 +1293,7 @@ async def menu_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     response = responses.get(text)
 
     if response:
+
         await update.message.reply_text(
             response,
             parse_mode=ParseMode.HTML,
@@ -853,117 +1301,225 @@ async def menu_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         if text == "📍 Manzil":
+
             await update.message.reply_location(
                 latitude=SCHOOL_LATITUDE,
                 longitude=SCHOOL_LONGITUDE,
             )
 
+
 # =========================================================
 # ERROR
 # =========================================================
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+async def error_handler(
+    update: object,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     logger.error(
         "Exception while handling update:",
         exc_info=context.error,
     )
 
+
 # =========================================================
-# MAIN
+# APPLICATION
 # =========================================================
 
 def build_application():
+
     init_db()
 
-    app = Application.builder().token(TOKEN).post_init(post_init).build()
+    app = (
+        Application
+        .builder()
+        .token(TOKEN)
+        .post_init(post_init)
+        .build()
+    )
 
     registration = ConversationHandler(
+
         entry_points=[
+
             MessageHandler(
-                filters.Regex(r"^📝 Ro‘yxatdan o‘tish$"),
+                filters.Regex(
+                    r"^📝 Ro‘yxatdan o‘tish$"
+                ),
                 register_start,
             ),
+
             CallbackQueryHandler(
                 register_start,
                 pattern=r"^register$",
             ),
         ],
+
         states={
+
             NAME: [
+
                 MessageHandler(
-                    filters.TEXT & ~filters.COMMAND,
+                    filters.TEXT
+                    & ~filters.COMMAND,
                     get_name,
                 )
+
             ],
+
             PHONE: [
+
                 MessageHandler(
-                    filters.CONTACT | (
-                        filters.TEXT & ~filters.COMMAND
+                    filters.CONTACT
+                    | (
+                        filters.TEXT
+                        & ~filters.COMMAND
                     ),
                     get_phone,
                 )
+
             ],
+
             BIRTHDAY: [
+
                 MessageHandler(
-                    filters.TEXT & ~filters.COMMAND,
+                    filters.TEXT
+                    & ~filters.COMMAND,
                     get_birthday,
                 )
+
             ],
+
             PASSPORT: [
+
                 MessageHandler(
-                    filters.PHOTO | filters.Document.ALL,
+                    filters.PHOTO
+                    | filters.Document.ALL,
                     get_passport,
                 )
+
             ],
+
             MEDICAL: [
+
                 MessageHandler(
-                    filters.PHOTO | filters.Document.ALL,
+                    filters.PHOTO
+                    | filters.Document.ALL,
                     get_medical,
                 )
+
             ],
+
             CATEGORY: [
+
                 CallbackQueryHandler(
                     get_category,
                     pattern=r"^category_",
                 )
+
             ],
         },
+
         fallbacks=[
-            CommandHandler("cancel", cancel),
+
+            CommandHandler(
+                "cancel",
+                cancel,
+            ),
+
             MessageHandler(
-                filters.Regex(r"^❌ Bekor qilish$"),
+                filters.Regex(
+                    r"^❌ Bekor qilish$"
+                ),
                 cancel,
             ),
         ],
+
         allow_reentry=True,
     )
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("admin", admin))
-    app.add_handler(CommandHandler("hisobot", weekly_report_command))
-    app.add_handler(registration)
+    # -----------------------------------------------------
+    # COMMANDS
+    # -----------------------------------------------------
+
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start,
+        )
+    )
+
+    app.add_handler(
+        CommandHandler(
+            "admin",
+            admin,
+        )
+    )
+
+    app.add_handler(
+        CommandHandler(
+            "hisobot",
+            weekly_report_command,
+        )
+    )
+
+    app.add_handler(
+        CommandHandler(
+            "myid",
+            my_id,
+        )
+    )
+
+    # -----------------------------------------------------
+    # REGISTRATION
+    # -----------------------------------------------------
+
+    app.add_handler(
+        registration
+    )
+
+    # -----------------------------------------------------
+    # ADMIN BUTTONS
+    # -----------------------------------------------------
+
     app.add_handler(
         CallbackQueryHandler(
             admin_buttons,
             pattern=r"^admin_",
         )
     )
+
+    # -----------------------------------------------------
+    # MENU
+    # -----------------------------------------------------
+
     app.add_handler(
         MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
+            filters.TEXT
+            & ~filters.COMMAND,
             menu_buttons,
         )
     )
 
-    app.add_error_handler(error_handler)
+    app.add_error_handler(
+        error_handler
+    )
 
     return app
 
 
+# =========================================================
+# MAIN
+# =========================================================
+
 def main():
+
     app = build_application()
 
-    logger.info("🚗 ZO‘R-777 AVTO MAKTAB bot ishga tushdi!")
+    logger.info(
+        "🚗 ZO‘R-777 AVTO MAKTAB bot ishga tushdi!"
+    )
 
     app.run_polling(
         poll_interval=1,
