@@ -690,26 +690,34 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================================================
 
 async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
+    """Admin huquqini xavfsiz tekshiradi.
 
-    if not user:
+    ADMIN_ID ikki xil holatda ishlashi mumkin:
+    - shaxsiy admin Telegram ID
+    - admin hisobot yuboriladigan guruh ID
+    """
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if not user or not chat:
         return False
 
-    # .env dagi ADMIN_ID egasi doim admin hisoblanadi.
+    # 1) ADMIN_ID shaxsiy Telegram ID bo‘lsa, egasi doim ruxsat oladi.
     if user.id == ADMIN_ID:
         return True
 
-    # Guruh/superguruhda yozayotgan foydalanuvchi admin yoki creator bo‘lsa ruxsat.
-    chat = update.effective_chat
-    if chat and chat.type in ("group", "supergroup"):
+    # 2) Hisobot yuboriladigan guruhda faqat guruh egasi/adminlariga ruxsat.
+    # ADMIN_ID guruh ID qilib qo‘yilgan bo‘lsa, shu guruhni nazarda tutamiz.
+    if chat.type in ("group", "supergroup") and chat.id == ADMIN_ID:
         try:
             member = await context.bot.get_chat_member(
                 chat_id=chat.id,
                 user_id=user.id,
             )
             return member.status in ("administrator", "creator")
-        except Exception:
-            logger.exception("Guruh adminini tekshirishda xatolik")
+        except Exception as e:
+            logger.error("Guruh adminini tekshirib bo‘lmadi: %s", e)
+            return False
 
     return False
 
