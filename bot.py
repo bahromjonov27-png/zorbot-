@@ -41,17 +41,17 @@ ADMIN_ID_RAW = os.getenv("ADMIN_ID")
 # ADMIN_USER_ID=6514150973,8487314122
 # =========================================================
 
-ADMIN_USER_ID_RAW = os.getenv("ADMIN_USER_ID", "")
+USER_ID_RAW = os.getenv("USER_ID", "")
 
 try:
     ADMIN_IDS = {
         int(x.strip())
-        for x in ADMIN_USER_ID_RAW.split(",")
+        for x in USER_ID_RAW.split(",")
         if x.strip()
     }
 except ValueError:
     raise RuntimeError(
-        "ADMIN_USER_ID noto‘g‘ri! "
+        "USER_ID noto‘g‘ri! "
         "Masalan: 6514150973,8487314122"
     )
 
@@ -92,7 +92,7 @@ except ValueError:
 
 if not ADMIN_IDS:
     raise RuntimeError(
-        "ADMIN_USER_ID environment variable topilmadi yoki bo‘sh!"
+        "USER_ID environment variable topilmadi yoki bo‘sh!"
     )
 
 
