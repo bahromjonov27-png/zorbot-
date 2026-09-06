@@ -28,7 +28,10 @@ from telegram.ext import (
 # =========================================================
 
 TOKEN = os.getenv("BOT_TOKEN")
+# Hisobotlar va arizalar yuboriladigan admin guruhining IDsi
 ADMIN_ID_RAW = os.getenv("ADMIN_ID")
+# Hisobot/admin buyruqlaridan foydalanishi mumkin bo‘lgan USER IDlar
+ADMIN_IDS_RAW = os.getenv("ADMIN_IDS", "6514150973,8487314122")
 DB_PATH = os.getenv("DB_PATH", "/tmp/avtomaktab.db" if os.getenv("VERCEL") else "avtomaktab.db")
 SCHOOL_LATITUDE = 41.329341
 SCHOOL_LONGITUDE = 69.238440
@@ -37,12 +40,21 @@ if not TOKEN:
     raise RuntimeError("BOT_TOKEN environment variable topilmadi!")
 
 if not ADMIN_ID_RAW:
-    raise RuntimeError("ADMIN_ID environment variable topilmadi!")
+    raise RuntimeError("ADMIN_ID environment variable topilmadi! Bu yerga admin GURUH IDsi yoziladi.")
 
 try:
     ADMIN_ID = int(ADMIN_ID_RAW)
 except ValueError:
     raise RuntimeError("ADMIN_ID raqam bo‘lishi kerak!")
+
+try:
+    ADMIN_IDS = {
+        int(x.strip())
+        for x in ADMIN_IDS_RAW.split(",")
+        if x.strip()
+    }
+except ValueError:
+    raise RuntimeError("ADMIN_IDS vergul bilan ajratilgan raqamli USER IDlar bo‘lishi kerak!")
 
 # =========================================================
 # LOGGING
@@ -628,10 +640,24 @@ async def weekly_report_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("⛔ Sizda admin huquqi yo‘q.")
         return
 
-    await update.message.reply_text(
-        build_weekly_report(),
-        parse_mode=ParseMode.HTML,
-    )
+    report = build_weekly_report()
+
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=report,
+            parse_mode=ParseMode.HTML,
+        )
+
+        # Agar buyruq shaxsiy chatdan yuborilgan bo‘lsa, yuborilgani haqida xabar beradi.
+        if update.effective_chat and update.effective_chat.id != ADMIN_ID:
+            await update.message.reply_text("✅ Haftalik hisobot admin guruhga yuborildi.")
+
+    except Exception:
+        logger.exception("/hisobot yuborishda xatolik")
+        await update.message.reply_text(
+            "❌ Hisobotni guruhga yuborib bo‘lmadi. ADMIN_ID guruh IDsi ekanini va bot guruhda ekanini tekshiring."
+        )
 
 
 async def weekly_report_loop(app):
@@ -690,36 +716,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================================================
 
 async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin huquqini xavfsiz tekshiradi.
-
-    ADMIN_ID ikki xil holatda ishlashi mumkin:
-    - shaxsiy admin Telegram ID
-    - admin hisobot yuboriladigan guruh ID
-    """
+    """Faqat ADMIN_IDS ichidagi Telegram USER IDlarga ruxsat beradi."""
     user = update.effective_user
-    chat = update.effective_chat
-
-    if not user or not chat:
+    if not user:
         return False
 
-    # 1) ADMIN_ID shaxsiy Telegram ID bo‘lsa, egasi doim ruxsat oladi.
-    if user.id == ADMIN_ID:
-        return True
-
-    # 2) Hisobot yuboriladigan guruhda faqat guruh egasi/adminlariga ruxsat.
-    # ADMIN_ID guruh ID qilib qo‘yilgan bo‘lsa, shu guruhni nazarda tutamiz.
-    if chat.type in ("group", "supergroup") and chat.id == ADMIN_ID:
-        try:
-            member = await context.bot.get_chat_member(
-                chat_id=chat.id,
-                user_id=user.id,
-            )
-            return member.status in ("administrator", "creator")
-        except Exception as e:
-            logger.error("Guruh adminini tekshirib bo‘lmadi: %s", e)
-            return False
-
-    return False
+    return user.id in ADMIN_IDS
 
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
